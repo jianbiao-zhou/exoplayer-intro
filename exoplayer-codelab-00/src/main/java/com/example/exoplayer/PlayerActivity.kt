@@ -15,14 +15,25 @@
  */
 package com.example.exoplayer
 
+import android.os.Build
 import android.os.Bundle
+import android.view.View
 import androidx.appcompat.app.AppCompatActivity
+import androidx.media3.common.MediaItem
+import androidx.media3.common.util.Util
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.SimpleExoPlayer
 import com.example.exoplayer.databinding.ActivityPlayerBinding
 
 /**
  * A fullscreen activity to play audio or video streams.
  */
 class PlayerActivity : AppCompatActivity() {
+
+    private var player: ExoPlayer? = null
+    private var playWhenReady = true
+    private var currentWindow = 0
+    private var playbackPosition = 0L
 
     private val viewBinding by lazy(LazyThreadSafetyMode.NONE) {
         ActivityPlayerBinding.inflate(layoutInflater)
@@ -31,5 +42,65 @@ class PlayerActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(viewBinding.root)
+    }
+
+    fun initVideoPlayer() {
+        player = ExoPlayer.Builder(this).build().also { exoPlayer ->
+            viewBinding.videoView.player = exoPlayer
+            val mediaItem = MediaItem.fromUri(getString(R.string.media_url_mp4))
+            exoPlayer.setMediaItem(mediaItem)
+            exoPlayer.playWhenReady = playWhenReady
+            exoPlayer.seekTo(currentWindow, playbackPosition)
+            exoPlayer.prepare()
+        }
+    }
+
+
+    override fun onStart() {
+        super.onStart()
+        if (Build.VERSION.SDK_INT >= 24) {
+            initVideoPlayer()
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        hideSystemUI()
+        if (Build.VERSION.SDK_INT < 24 || player == null) {
+            initVideoPlayer()
+        }
+    }
+
+    private fun hideSystemUI() {
+        viewBinding.videoView.systemUiVisibility = (View.SYSTEM_UI_FLAG_LOW_PROFILE
+                or View.SYSTEM_UI_FLAG_FULLSCREEN
+                or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        if (Build.VERSION.SDK_INT < 24) {
+            releasePlayer()
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        if (Build.VERSION.SDK_INT >= 24) {
+            releasePlayer()
+        }
+    }
+
+    private fun releasePlayer() {
+        player?.run {
+            playbackPosition = this.currentPosition
+            currentWindow = this.currentWindowIndex
+            playWhenReady = this.playWhenReady
+            release()
+        }
+        player = null
     }
 }
